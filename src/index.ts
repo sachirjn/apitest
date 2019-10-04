@@ -4,12 +4,23 @@ import sqlite from 'sqlite';
 import koaBody from 'koa-bodyparser';
 import jwt from 'jsonwebtoken';
 import sqlString from 'sqlstring';
+import Ajv from 'ajv';
 
 //server settings
 const app = new Koa();
 const PORT = process.env.PORT || 3000;
 const router = new Router();
 const authsecrekey = 'woahsosecured';
+
+//validations
+const ajv = new Ajv({ allErrors: true });
+const validateCredentials = ajv.compile({
+    properties: {
+        id: { type: 'number', minimum: 1 },
+        email: { type: 'string', minLength: 3, pattern: '.+\\@.+\\..+' },
+        password: { type: 'string', minLength: 6 },
+    },
+});
 
 //Setup Db
 let db: sqlite.Database;
@@ -34,8 +45,10 @@ function authenticateUser(authkey: string): number {
         const token = bearer[1];
         if (typeof token !== 'undefined' && token !== '') {
             decoded = jwt.verify(token, authsecrekey);
-            if (typeof decoded !== 'undefined') {
+            if (validateCredentials(decoded)) {
                 return decoded.id;
+            } else {
+                console.log('Auth Error: ' + ajv.errorsText(validateCredentials.errors));
             }
         }
     }
@@ -44,21 +57,16 @@ function authenticateUser(authkey: string): number {
 
 //Routes
 //create user
-router.post('/api/users', koaBody(), async ctx => {
+router.post('/api/users', async ctx => {
     const postBody = ctx.request.body;
     if (typeof postBody !== 'undefined') {
-        if (
-            postBody['email'] !== '' &&
-            typeof postBody['email'] !== 'undefined' &&
-            postBody['password'] !== '' &&
-            typeof postBody['password'] !== 'undefined'
-        ) {
+        if (validateCredentials(postBody)) {
             const res = await db.run(
                 'INSERT INTO Users(firstname, lastname, email, password) VALUES(?,?,?,?)',
-                postBody['firstname'],
-                postBody['lastname'],
-                postBody['email'],
-                postBody['password'],
+                postBody.firstname,
+                postBody.lastname,
+                postBody.email,
+                postBody.password,
                 (err: string) => {
                     if (err) {
                         ctx.response.status = 500;
@@ -75,8 +83,9 @@ router.post('/api/users', koaBody(), async ctx => {
         } else {
             ctx.response.status = 400;
             ctx.response.body = JSON.stringify({
-                message: 'email and password is required',
+                message: ajv.errorsText(validateCredentials.errors),
             });
+            console.log('Create Error: ' + ajv.errorsText(validateCredentials.errors));
         }
     } else {
         ctx.response.status = 400;
@@ -86,15 +95,15 @@ router.post('/api/users', koaBody(), async ctx => {
     }
 });
 //authenticate
-router.post('/api/auth', koaBody(), async ctx => {
+router.post('/api/auth', async ctx => {
     const postBody = ctx.request.body;
-    if (typeof postBody !== 'undefined') {
+    if (postBody !== undefined) {
         const userCredentials = await db.get(
             `SELECT id, email, password FROM Users WHERE email = ? AND password=?`,
-            postBody['email'],
-            postBody['password'],
+            postBody.email,
+            postBody.password,
         );
-        if (typeof userCredentials !== 'undefined') {
+        if (validateCredentials(userCredentials)) {
             const token = jwt.sign(userCredentials, authsecrekey);
             ctx.response.body = {
                 token: token,
@@ -104,6 +113,7 @@ router.post('/api/auth', koaBody(), async ctx => {
             ctx.response.body = JSON.stringify({
                 message: 'Incorrect authentication credentials',
             });
+            console.log('Auth Error: ' + ajv.errorsText(validateCredentials.errors));
         }
     } else {
         ctx.response.status = 400;
@@ -122,7 +132,7 @@ router.get('/api/users', async ctx => {
             ctx.response.body = JSON.stringify(users);
         } else {
             ctx.response.body = JSON.stringify({
-                message: 'no results found',
+                message: 'No results found',
             });
         }
     } else {
@@ -142,7 +152,7 @@ router.get('/api/users/:id', async ctx => {
             ctx.response.body = JSON.stringify(userRes);
         } else {
             ctx.response.body = JSON.stringify({
-                message: 'user not found found',
+                message: 'User not found found',
             });
         }
     } else {
@@ -150,12 +160,11 @@ router.get('/api/users/:id', async ctx => {
     }
 });
 //update own data
-router.patch('/api/users', koaBody(), async ctx => {
+router.patch('/api/users', async ctx => {
     const authkey: string = ctx.request.headers['authorization'];
     const authorizedUID = authenticateUser(authkey);
     if (authorizedUID > 0) {
         const postBody = ctx.request.body;
-        let emailValidation = '';
         let setQ = '';
         const postKeys = Object.keys(postBody);
         postKeys.forEach(element => {
@@ -164,30 +173,18 @@ router.patch('/api/users', koaBody(), async ctx => {
             }
             setQ += element + '=' + sqlString.escape(postBody[element]);
         });
+        if (postBody !== undefined) {
+            const query = sqlString.format(`UPDATE Users SET ${setQ} WHERE id=?`, [authorizedUID]);
+            await db.run(query, (err: string) => {
+                if (err) {
+                    ctx.response.status = 500;
+                    console.log(err);
+                }
+            });
 
-        if (typeof postBody !== 'undefined') {
-            if (!postBody['email']) {
-                emailValidation = 'email is required';
-            }
-            if (emailValidation === '') {
-                const query = sqlString.format(`UPDATE Users SET ${setQ} WHERE id=?`, [authorizedUID]);
-                await db.run(query, (err: string) => {
-                    if (err) {
-                        ctx.response.status = 500;
-                        console.log(err);
-                    }
-                });
-
-                const user = await db.get('SELECT * FROM Users WHERE id = ?', authorizedUID);
-                console.log(user);
-                ctx.response.status = 200;
-                ctx.response.body = JSON.stringify(user);
-            } else {
-                ctx.response.status = 400;
-                ctx.response.body = JSON.stringify({
-                    message: emailValidation,
-                });
-            }
+            const user = await db.get('SELECT * FROM Users WHERE id = ?', authorizedUID);
+            ctx.response.status = 200;
+            ctx.response.body = JSON.stringify(user);
         } else {
             ctx.response.status = 400;
             ctx.response.body = JSON.stringify({
@@ -199,6 +196,7 @@ router.patch('/api/users', koaBody(), async ctx => {
     }
 });
 
+app.use(koaBody());
 app.use(router.routes());
 
 const server = app.listen(PORT, () => {
