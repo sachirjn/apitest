@@ -59,33 +59,41 @@ function authenticateUser(authkey: string): number {
 //create user
 router.post('/api/users', async ctx => {
     const postBody = ctx.request.body;
-    if (typeof postBody !== 'undefined') {
-        if (validateCredentials(postBody)) {
-            const res = await db.run(
-                'INSERT INTO Users(firstname, lastname, email, password) VALUES(?,?,?,?)',
-                postBody.firstname,
-                postBody.lastname,
-                postBody.email,
-                postBody.password,
-                (err: string) => {
-                    if (err) {
-                        ctx.response.status = 500;
-                        console.log(err);
-                    }
-                },
-            );
-            if (res.lastID > 0) {
-                const user = await db.get('SELECT id, email, firstname, lastname FROM Users WHERE id = ?', res.lastID);
-                ctx.response.body = JSON.stringify(user);
+    if (postBody !== undefined) {
+        //check if email is unique
+        const emailExist = await db.get('SELECT email FROM Users WHERE email = ?', postBody.email);
+        if (emailExist === undefined && postBody.email !== undefined && postBody.password !== undefined) {
+            if (validateCredentials(postBody)) {
+                const res = await db.run(
+                    'INSERT INTO Users(firstname, lastname, email, password) VALUES(?,?,?,?)',
+                    postBody.firstname,
+                    postBody.lastname,
+                    postBody.email,
+                    postBody.password,
+                    (err: string) => {
+                        if (err) {
+                            ctx.response.status = 500;
+                            console.log(err);
+                        }
+                    },
+                );
+                if (res.lastID > 0) {
+                    const user = await db.get('SELECT * FROM Users WHERE id = ?', res.lastID);
+                    ctx.response.body = JSON.stringify(user);
+                } else {
+                    ctx.response.status = 500;
+                }
             } else {
-                ctx.response.status = 500;
+                ctx.response.status = 400;
+                ctx.response.body = JSON.stringify({
+                    message: ajv.errorsText(validateCredentials.errors),
+                });
             }
         } else {
             ctx.response.status = 400;
             ctx.response.body = JSON.stringify({
-                message: ajv.errorsText(validateCredentials.errors),
+                message: 'Unique email and password is required.',
             });
-            console.log('Create Error: ' + ajv.errorsText(validateCredentials.errors));
         }
     } else {
         ctx.response.status = 400;
@@ -103,17 +111,25 @@ router.post('/api/auth', async ctx => {
             postBody.email,
             postBody.password,
         );
-        if (validateCredentials(userCredentials)) {
-            const token = jwt.sign(userCredentials, authsecrekey);
-            ctx.response.body = {
-                token: token,
-            };
+        if (userCredentials !== undefined) {
+            if (validateCredentials(userCredentials)) {
+                const token = jwt.sign(userCredentials, authsecrekey);
+                ctx.response.status = 200;
+                ctx.response.body = {
+                    token: token,
+                };
+            } else {
+                ctx.response.status = 400;
+                ctx.response.body = JSON.stringify({
+                    message: 'Invalid login',
+                });
+                console.log('Auth Error: ' + ajv.errorsText(validateCredentials.errors));
+            }
         } else {
             ctx.response.status = 400;
             ctx.response.body = JSON.stringify({
-                message: 'Incorrect authentication credentials',
+                message: 'Invalid login',
             });
-            console.log('Auth Error: ' + ajv.errorsText(validateCredentials.errors));
         }
     } else {
         ctx.response.status = 400;
@@ -127,7 +143,7 @@ router.get('/api/users', async ctx => {
     const authkey: string = ctx.request.headers['authorization'];
     const authorizedUID = authenticateUser(authkey);
     if (authorizedUID > 0) {
-        const users = await db.all(`SELECT id, email, firstname, lastname FROM Users`);
+        const users = await db.all('SELECT * FROM Users');
         if (users !== undefined) {
             ctx.response.body = JSON.stringify(users);
         } else {
@@ -146,7 +162,7 @@ router.get('/api/users/:id', async ctx => {
     if (authorizedUID > 0) {
         ctx.response.status = 200;
         //search user
-        const userRes = await db.get('SELECT id, email, firstname, lastname FROM Users WHERE id = ?', ctx.params.id);
+        const userRes = await db.get('SELECT * FROM Users WHERE id = ?', ctx.params.id);
         ctx.response.status = 200;
         if (userRes !== undefined) {
             ctx.response.body = JSON.stringify(userRes);
@@ -199,8 +215,6 @@ router.patch('/api/users', async ctx => {
 app.use(koaBody());
 app.use(router.routes());
 
-const server = app.listen(PORT, () => {
+export const server = app.listen(PORT, () => {
     console.log(`Server listening on port: ${PORT}`);
 });
-
-module.exports = server;
