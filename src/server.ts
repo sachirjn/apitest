@@ -13,7 +13,7 @@ export let db: sqlite.Database;
 function setDb(dbRes: sqlite.Database): void {
     db = dbRes;
 }
-export const dbProm = dbCon.then(async result => {
+dbCon.then(async result => {
     setDb(result);
 });
 
