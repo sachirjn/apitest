@@ -107,12 +107,20 @@ describe('Check Authentication and User Endpoints', () => {
         chai.request(server)
             .patch('/api/users')
             .set('authorization', token)
-            .send({ firstname: 'First Name', lastname: 'Last Name' })
+            .send({
+                email: 'testnew@example.com',
+                password: 'password123',
+                firstname: 'First Name',
+                lastname: 'Last Name',
+            })
             .end((err, res) => {
                 const jsonRes = JSON.parse(res.text);
                 expect(res).to.have.status(200);
-                expect(jsonRes.firstname).to.equals('First Name');
-                expect(jsonRes.lastname).to.equals('Last Name');
+                expect(jsonRes.user.firstname).to.equals('First Name');
+                expect(jsonRes.user.lastname).to.equals('Last Name');
+                expect(jsonRes.message).to.equals(
+                    'You have successfully changed your password/email. Please login again.',
+                );
                 done();
             });
     });

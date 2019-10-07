@@ -99,6 +99,7 @@ export function setRoutes(): Router {
     //update own data
     router.patch('/api/users', async ctx => {
         const postBody = ctx.request.body;
+        let message = '';
         if (postBody === undefined) {
             ctx.response.status = 400;
             ctx.response.body = JSON.stringify({
@@ -115,13 +116,18 @@ export function setRoutes(): Router {
                 if (setQ !== '') {
                     setQ += ', ';
                 }
+                postBody[element] = element === 'password' ? bcrypt.hashSync(postBody.password, 10) : postBody[element];
                 setQ += element + '=' + sqlString.escape(postBody[element]);
             });
+
+            if (postBody.password !== undefined || postBody.email !== undefined) {
+                message = 'You have successfully changed your password/email. Please login again.';
+            }
             const query = sqlString.format(`UPDATE Users SET ${setQ} WHERE id=?`, [authorizedUID]);
             await db.run(query);
             const user = await db.get('SELECT id, email, firstname, lastname FROM Users WHERE id = ?', authorizedUID);
             ctx.response.status = 200;
-            ctx.response.body = JSON.stringify(user);
+            ctx.response.body = JSON.stringify({ user: user, message: message });
         } else {
             ctx.response.status = 403;
         }
