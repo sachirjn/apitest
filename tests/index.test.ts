@@ -1,7 +1,8 @@
 import chai from 'chai';
 import chaiHttp from 'chai-http';
 import sqlite from 'sqlite';
-import { server } from '../src/index';
+import { server } from '../src/server';
+import { dbname } from '../src/config';
 
 const { expect } = chai;
 chai.use(chaiHttp);
@@ -11,7 +12,7 @@ let userTestID = 0;
 let totalUsers: Promise<number>;
 let db: sqlite.Database;
 async function connect(): Promise<void> {
-    db = await sqlite.open('./database.sqlite');
+    db = await sqlite.open(dbname);
 }
 async function getAllUsers(): Promise<number> {
     const users = await db.all(`SELECT id, email, password, firstname, lastname FROM Users`);
@@ -26,13 +27,17 @@ describe('Check Authentication and User Endpoints', () => {
     it('Create User', done => {
         chai.request(server)
             .post('/api/users')
-            .send({ email: 'test@example.com', password: 'test123', firstname: 'Test', lastname: 'Unit' })
+            .send({
+                email: 'test@example.com',
+                password: 'test123',
+                firstname: 'Test',
+                lastname: 'Unit',
+            })
             .end((err, res) => {
                 const jsonRes = JSON.parse(res.text);
                 expect(res).to.have.status(200);
                 expect(jsonRes.id).to.not.equal(null);
                 expect(jsonRes.email).to.equals('test@example.com');
-                expect(jsonRes.password).to.equals('test123');
                 expect(jsonRes.firstname).to.equals('Test');
                 expect(jsonRes.lastname).to.equals('Unit');
                 userTestID = jsonRes.id;
@@ -69,7 +74,6 @@ describe('Check Authentication and User Endpoints', () => {
             .end((err, res) => {
                 const jsonRes = JSON.parse(res.text);
                 expect(res).to.have.status(200);
-                //check if the user ID returned is correct
                 expect(jsonRes.id).to.equals(userTestID);
                 done();
             });
@@ -81,7 +85,7 @@ describe('Check Authentication and User Endpoints', () => {
             .end((err, res) => {
                 const jsonRes = JSON.parse(res.text);
                 expect(res).to.have.status(200);
-                expect(jsonRes.id).to.not.equals('100');
+                expect(jsonRes).to.not.equal(null);
                 done();
             });
     });
@@ -103,12 +107,10 @@ describe('Check Authentication and User Endpoints', () => {
         chai.request(server)
             .patch('/api/users')
             .set('authorization', token)
-            .send({ email: 'email@example.com', password: 'pass123', firstname: 'First Name', lastname: 'Last Name' })
+            .send({ firstname: 'First Name', lastname: 'Last Name' })
             .end((err, res) => {
                 const jsonRes = JSON.parse(res.text);
                 expect(res).to.have.status(200);
-                expect(jsonRes.email).to.equals('email@example.com');
-                expect(jsonRes.password).to.equals('pass123');
                 expect(jsonRes.firstname).to.equals('First Name');
                 expect(jsonRes.lastname).to.equals('Last Name');
                 done();
