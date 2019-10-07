@@ -1,7 +1,7 @@
 import chai from 'chai';
 import chaiHttp from 'chai-http';
 import sqlite from 'sqlite';
-import { server } from '../index';
+import { server } from '../src/index';
 
 const { expect } = chai;
 chai.use(chaiHttp);
