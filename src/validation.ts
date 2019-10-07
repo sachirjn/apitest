@@ -12,6 +12,13 @@ export const validateCredentials = ajv.compile({
     },
     required: ['email', 'password'],
 });
+export const validatePatch = ajv.compile({
+    properties: {
+        id: { type: 'number', minimum: 1 },
+        email: { type: 'string', format: 'email' },
+        password: { type: ['string', 'number'], minLength: 6 },
+    },
+});
 
 export async function authenticateUser(authkey: string): Promise<number> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

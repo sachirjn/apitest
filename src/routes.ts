@@ -2,7 +2,7 @@ import Router from 'koa-router';
 import jwt from 'jsonwebtoken';
 import sqlString from 'sqlstring';
 import bcrypt from 'bcrypt';
-import { validateCredentials, ajv, authenticateUser } from './validation';
+import { validateCredentials, validatePatch, ajv, authenticateUser } from './validation';
 import { db } from './server';
 import { authsecrekey } from './config';
 
@@ -100,10 +100,10 @@ export function setRoutes(): Router {
     router.patch('/api/users', async ctx => {
         const postBody = ctx.request.body;
         let message = '';
-        if (postBody === undefined) {
+        if (!validatePatch(postBody)) {
             ctx.response.status = 400;
             ctx.response.body = JSON.stringify({
-                message: ajv.errorsText(validateCredentials.errors),
+                message: ajv.errorsText(validatePatch.errors),
             });
             return;
         }
