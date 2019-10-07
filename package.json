@@ -4,10 +4,10 @@
     "description": "",
     "main": "build/index.js",
     "scripts": {
-        "test": "mocha build/test/index.test.js",
-        "start": "node build/index.js",
-        "build": "tsc",
-        "lint": "tsc --noEmit && eslint '*/**/*.{js,ts,tsx}' --fix"
+        "test": "mocha -r ts-node/register tests/**/*.test.ts",
+        "start": "ts-node src/index.ts",
+        "build": "rimraf ./build && tsc --project tsconfig.build.json",
+        "lint": "tsc --noEmit && eslint --ext .ts,.tsx src/** tests/** --fix"
     },
     "author": "Sachi",
     "license": "ISC",
@@ -30,6 +30,7 @@
         "eslint-plugin-prettier": "^3.1.1",
         "mocha": "^6.2.1",
         "prettier": "^1.18.2",
+        "ts-node": "^8.4.1",
         "typescript": "^3.6.3"
     },
     "dependencies": {
