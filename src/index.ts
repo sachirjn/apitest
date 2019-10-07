@@ -17,8 +17,8 @@ const ajv = new Ajv({ allErrors: true });
 const validateCredentials = ajv.compile({
     properties: {
         id: { type: 'number', minimum: 1 },
-        email: { type: 'string', minLength: 3, pattern: '.+\\@.+\\..+' },
-        password: { type: 'string', minLength: 6 },
+        email: { type: 'string', format: 'email' },
+        password: { type: ['string', 'number'], minLength: 6 },
     },
 });
 
@@ -43,7 +43,7 @@ function authenticateUser(authkey: string): number {
     if (typeof authkey !== 'undefined') {
         const bearer = authkey.split(' ');
         const token = bearer[1];
-        if (typeof token !== 'undefined' && token !== '') {
+        if (token !== undefined) {
             decoded = jwt.verify(token, authsecrekey);
             if (validateCredentials(decoded)) {
                 return decoded.id;
@@ -128,7 +128,7 @@ router.get('/api/users', async ctx => {
     const authorizedUID = authenticateUser(authkey);
     if (authorizedUID > 0) {
         const users = await db.all(`SELECT id, email, firstname, lastname FROM Users`);
-        if (typeof users !== 'undefined') {
+        if (users !== undefined) {
             ctx.response.body = JSON.stringify(users);
         } else {
             ctx.response.body = JSON.stringify({
@@ -148,7 +148,7 @@ router.get('/api/users/:id', async ctx => {
         //search user
         const userRes = await db.get('SELECT id, email, firstname, lastname FROM Users WHERE id = ?', ctx.params.id);
         ctx.response.status = 200;
-        if (typeof userRes !== 'undefined') {
+        if (userRes !== undefined) {
             ctx.response.body = JSON.stringify(userRes);
         } else {
             ctx.response.body = JSON.stringify({
