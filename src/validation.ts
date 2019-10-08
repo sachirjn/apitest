@@ -14,7 +14,6 @@ export const validateCredentials = ajv.compile({
 });
 export const validatePatch = ajv.compile({
     properties: {
-        id: { type: 'number', minimum: 1 },
         email: { type: 'string', format: 'email' },
         password: { type: ['string', 'number'], minLength: 6 },
     },
