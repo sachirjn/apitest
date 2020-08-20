@@ -37,7 +37,7 @@
     "dependencies": {
         "ajv": "^6.10.2",
         "async": "^3.1.0",
-        "bcrypt": "^3.0.6",
+        "bcrypt": "^5.0.0",
         "jsonwebtoken": "^8.5.1",
         "koa": "^2.8.2",
         "koa-bodyparser": "^4.2.1",
